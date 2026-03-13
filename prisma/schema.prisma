@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Player {
+  id        String   @id @default(uuid())
+  nickname  String
+  sessionId String   @unique
+  score     Int      @default(0)
+  gamesPlayed Int    @default(0)
+  gamesWon  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seats     Seat[]
+  rounds    RoundScore[]
+
+  @@index([sessionId])
+}
+
+model Table {
+  id          String      @id @default(uuid())
+  name        String
+  status      TableStatus @default(WAITING)
+  maxPlayers  Int         @default(4)
+  currentRound Int        @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  seats    Seat[]
+  rounds   Round[]
+}
+
+model Seat {
+  id       String @id @default(uuid())
+  position Int
+
+  tableId  String
+  table    Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tableId, position])
+  @@unique([tableId, playerId])
+}
+
+model Round {
+  id        String      @id @default(uuid())
+  roundNum  Int
+  status    RoundStatus @default(IN_PROGRESS)
+  gameState Json
+
+  tableId   String
+  table     Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  endedAt   DateTime?
+  scores    RoundScore[]
+
+  @@unique([tableId, roundNum])
+}
+
+model RoundScore {
+  id       String @id @default(uuid())
+  score    Int
+  cards    Json
+
+  roundId  String
+  round    Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, playerId])
+}
+
+enum TableStatus {
+  WAITING
+  IN_GAME
+  FINISHED
+}
+
+enum RoundStatus {
+  IN_PROGRESS
+  FINISHED
+}
