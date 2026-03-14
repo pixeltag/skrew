@@ -32,6 +32,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     const {
         setTables,
+        setPlayer,
         setCurrentTable,
         setConnected,
         updateTableInList,
@@ -61,15 +62,21 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         });
 
         // Lobby events
+        socket.on("lobby:joined", (player) => {
+            setPlayer(player.id, player.nickname);
+        });
+
         socket.on("lobby:tables_update", (tables) => {
             setTables(tables);
         });
 
         socket.on("lobby:table_update", (table) => {
             updateTableInList(table);
-            // If this is the table we're currently at
             const { currentTable } = useLobbyStore.getState();
-            if (currentTable?.id === table.id) {
+            const { view } = useGameStore.getState();
+
+            // If this is the table we're currently at, or we are waiting for it
+            if (currentTable?.id === table.id || view === "table") {
                 setCurrentTable(table);
             }
         });

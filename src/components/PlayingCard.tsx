@@ -47,8 +47,11 @@ export default function PlayingCard({
     faceDown,
     className,
 }: PlayingCardProps) {
-    const shouldShowFace = !faceDown && !card.isHidden && card.faceUp;
-    const isFaceDown = faceDown || card.isHidden || !card.faceUp;
+    // A card is face-down visually if:
+    // 1. Explicitly passed faceDown prop
+    // 2. OR it is hidden from this client
+    const isFaceDown = faceDown || card.isHidden;
+    const shouldShowFace = !isFaceDown;
 
     const isSpecial = card.rank ? SPECIAL_RANKS.includes(card.rank) : false;
     const isKing = card.rank === KING;

@@ -24,6 +24,7 @@ export interface Card {
   rank: Rank;
   value: number;     // point value: A=1, 2-9 face, 10/J/Q/K=10, special rules
   faceUp: boolean;   // whether card is visible to all
+  peekedBy?: string | null; // playerId who is peeking this card privately
 }
 
 // ============================================================
@@ -39,6 +40,7 @@ export interface PlayerInfo {
 
 export interface PlayerHand {
   playerId: string;
+  nickname: string;
   cards: Card[];       // all 4 cards (only 2 are initially revealed)
   score: number;       // cumulative score
 }
@@ -149,6 +151,7 @@ export interface ClientToServerEvents {
 // Server -> Client
 export interface ServerToClientEvents {
   // Lobby
+  "lobby:joined": (player: PlayerInfo) => void;
   "lobby:tables_update": (tables: TableInfo[]) => void;
   "lobby:table_update": (table: TableInfo) => void;
   "lobby:error": (message: string) => void;
@@ -183,6 +186,7 @@ export interface ClientCard {
 
 export interface ClientPlayerHand {
   playerId: string;
+  nickname: string;
   cards: ClientCard[];
 }
 

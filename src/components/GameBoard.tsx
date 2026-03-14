@@ -30,53 +30,62 @@ export default function GameBoard() {
     // Get other players
     const otherPlayers = gameState?.players.filter((p) => p.playerId !== playerId) ?? [];
 
-    // Map playerId to nickname
+    // Map playerId to nickname from gameState
     const playerNames: Record<string, string> = {};
-    currentTable?.players.forEach((p) => {
-        playerNames[p.id] = p.nickname;
+    gameState?.players.forEach((p) => {
+        playerNames[p.playerId] = p.nickname;
     });
+
+    // Reset local states for new round
+    useEffect(() => {
+        if (gameState?.round) {
+            setPeekDone(false);
+            setSelectedHandIndex(null);
+        }
+    }, [gameState?.round]);
 
     // Handle initial peek done
     const handlePeekDone = () => {
+        if (!gameState) return;
         setPeekDone(true);
-        socket.emit("game:peek_done", { tableId: currentTable!.id });
+        socket.emit("game:peek_done", { tableId: gameState.tableId });
     };
 
     // Draw from deck
     const handleDrawDeck = () => {
-        if (!isMyTurn || hasDrawnCard || phase !== "playing") return;
-        socket.emit("game:draw_deck", { tableId: currentTable!.id });
+        if (!gameState || !isMyTurn || hasDrawnCard || (phase !== "playing" && phase !== "screw_called")) return;
+        socket.emit("game:draw_deck", { tableId: gameState.tableId });
     };
 
     // Draw from discard
     const handleDrawDiscard = () => {
-        if (!isMyTurn || hasDrawnCard || phase !== "playing") return;
-        if (!gameState?.discardTop) return;
-        socket.emit("game:draw_discard", { tableId: currentTable!.id });
+        if (!gameState || !isMyTurn || hasDrawnCard || (phase !== "playing" && phase !== "screw_called")) return;
+        if (!gameState.discardTop) return;
+        socket.emit("game:draw_discard", { tableId: gameState.tableId });
     };
 
     // Swap drawn card with hand card
     const handleSwapCard = (index: number) => {
-        if (!isMyTurn || !hasDrawnCard) return;
+        if (!gameState || !isMyTurn || !hasDrawnCard) return;
         socket.emit("game:swap_card", {
-            tableId: currentTable!.id,
+            tableId: gameState.tableId,
             handIndex: index,
-            drawnCardId: gameState!.drawnCard!.id,
+            drawnCardId: gameState.drawnCard!.id,
         });
         setSelectedHandIndex(null);
     };
 
     // Discard drawn card
     const handleDiscardDrawn = () => {
-        if (!isMyTurn || !hasDrawnCard) return;
-        socket.emit("game:discard_drawn", { tableId: currentTable!.id, cardId: gameState!.drawnCard!.id });
+        if (!gameState || !isMyTurn || !hasDrawnCard) return;
+        socket.emit("game:discard_drawn", { tableId: gameState.tableId, cardId: gameState.drawnCard!.id });
     };
 
     // Call SCREW
     const handleCallScrew = () => {
-        if (!isMyTurn || hasDrawnCard || phase !== "playing") return;
+        if (!gameState || !isMyTurn || hasDrawnCard || phase !== "playing") return;
         if (confirm("Call SCREW? All players get one more turn, then cards are revealed!")) {
-            socket.emit("game:call_screw", { tableId: currentTable!.id });
+            socket.emit("game:call_screw", { tableId: gameState.tableId });
         }
     };
 
@@ -151,12 +160,12 @@ export default function GameBoard() {
                             <div className="flex flex-col items-center gap-2">
                                 <motion.div
                                     id="deck-pile"
-                                    onClick={isMyTurn && !hasDrawnCard && phase === "playing" ? handleDrawDeck : undefined}
-                                    whileHover={isMyTurn && !hasDrawnCard && phase === "playing" ? { scale: 1.08 } : {}}
-                                    whileTap={isMyTurn && !hasDrawnCard && phase === "playing" ? { scale: 0.95 } : {}}
+                                    onClick={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? handleDrawDeck : undefined}
+                                    whileHover={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? { scale: 1.08 } : {}}
+                                    whileTap={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? { scale: 0.95 } : {}}
                                     className={clsx(
                                         "relative w-20 h-28 rounded-xl border-2 transition-all",
-                                        isMyTurn && !hasDrawnCard && phase === "playing"
+                                        isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called")
                                             ? "border-emerald-400 cursor-pointer shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/30"
                                             : "border-emerald-800/50 cursor-default"
                                     )}
@@ -170,7 +179,7 @@ export default function GameBoard() {
                                     </div>
                                 </motion.div>
                                 <span className="text-gray-500 text-xs">{gameState.deckCount} cards</span>
-                                {isMyTurn && !hasDrawnCard && phase === "playing" && (
+                                {isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") && (
                                     <span className="text-emerald-400 text-xs font-bold animate-pulse">Draw</span>
                                 )}
                             </div>
@@ -181,12 +190,12 @@ export default function GameBoard() {
                                     {gameState.discardTop ? (
                                         <motion.div
                                             id="discard-pile"
-                                            onClick={isMyTurn && !hasDrawnCard && phase === "playing" ? handleDrawDiscard : undefined}
-                                            whileHover={isMyTurn && !hasDrawnCard && phase === "playing" ? { scale: 1.08 } : {}}
-                                            whileTap={isMyTurn && !hasDrawnCard && phase === "playing" ? { scale: 0.95 } : {}}
+                                            onClick={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? handleDrawDiscard : undefined}
+                                            whileHover={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? { scale: 1.08 } : {}}
+                                            whileTap={isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") ? { scale: 0.95 } : {}}
                                             className={clsx(
                                                 "absolute inset-0 transition-all",
-                                                isMyTurn && !hasDrawnCard && phase === "playing"
+                                                isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called")
                                                     ? "cursor-pointer"
                                                     : "cursor-default"
                                             )}
@@ -200,7 +209,7 @@ export default function GameBoard() {
                                                 size="md"
                                                 className={clsx(
                                                     "w-full h-full",
-                                                    isMyTurn && !hasDrawnCard && phase === "playing" && "ring-2 ring-amber-400/50"
+                                                    isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") && "ring-2 ring-amber-400/50"
                                                 )}
                                             />
                                         </motion.div>
@@ -211,7 +220,7 @@ export default function GameBoard() {
                                     )}
                                 </div>
                                 <span className="text-gray-500 text-xs">Discard</span>
-                                {isMyTurn && !hasDrawnCard && phase === "playing" && gameState.discardTop && (
+                                {isMyTurn && !hasDrawnCard && (phase === "playing" || phase === "screw_called") && gameState.discardTop && (
                                     <span className="text-amber-400 text-xs font-bold animate-pulse">Take</span>
                                 )}
                             </div>
@@ -325,28 +334,41 @@ export default function GameBoard() {
                     )}
 
                     {/* Peek phase overlay */}
-                    {phase === "peek" && !peekDone && (
+                    {phase === "peek" && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center pb-40 z-50"
+                            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-end justify-center pb-40 z-50 pointer-events-none"
                         >
-                            <div className="bg-white/10 border border-white/20 rounded-2xl p-6 text-center max-w-sm mx-4">
-                                <h3 className="text-white font-black text-xl mb-2">
-                                    👀 Peek Phase
+                            <div className="bg-gray-900/90 border border-white/20 rounded-2xl p-6 text-center max-w-sm mx-4 shadow-2xl pointer-events-auto">
+                                <h3 className="text-white font-black text-xl mb-2 flex items-center justify-center gap-2">
+                                    <span className="animate-bounce">👀</span> Peek Phase
                                 </h3>
-                                <p className="text-gray-300 text-sm mb-4">
-                                    Memorize 2 of your face-down cards. No one else can see them!
-                                </p>
-                                <motion.button
-                                    id="peek-done-btn"
-                                    onClick={handlePeekDone}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold px-8 py-3 rounded-xl"
-                                >
-                                    Got it, I'm ready!
-                                </motion.button>
+                                {peekDone ? (
+                                    <div className="space-y-4">
+                                        <p className="text-emerald-400 font-bold">
+                                            Waiting for other players to memorize…
+                                        </p>
+                                        <div className="flex justify-center">
+                                            <div className="w-8 h-8 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-gray-300 text-sm mb-4">
+                                            Memorize your 2 outer cards. <br />Everyone else is doing the same!
+                                        </p>
+                                        <motion.button
+                                            id="peek-done-btn"
+                                            onClick={handlePeekDone}
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black px-8 py-3 rounded-xl shadow-lg ring-2 ring-emerald-500/20"
+                                        >
+                                            I've Memorized Them!
+                                        </motion.button>
+                                    </>
+                                )}
                             </div>
                         </motion.div>
                     )}
@@ -425,15 +447,16 @@ function RoundResultModal() {
     const { currentTable, playerId } = useLobbyStore();
     const socket = getSocket();
 
-    if (!roundResult) return null;
+    if (!roundResult || !gameState) return null;
 
     const playerNames: Record<string, string> = {};
-    currentTable?.players.forEach((p) => {
-        playerNames[p.id] = p.nickname;
+    gameState?.players.forEach((p) => {
+        playerNames[p.playerId] = p.nickname;
     });
 
     const handleNextRound = () => {
-        socket.emit("game:start", { tableId: currentTable!.id });
+        if (!gameState) return;
+        socket.emit("game:start", { tableId: gameState.tableId });
     };
 
     const sortedPlayers = Object.entries(roundResult.cumulative).sort(

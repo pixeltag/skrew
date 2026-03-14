@@ -136,6 +136,7 @@ export function initializeGameState(
 
         return {
             playerId: player.id,
+            nickname: player.nickname,
             cards,
             score: prevScores[player.id] ?? 0,
         };
@@ -174,7 +175,7 @@ export function drawFromDeck(
 ): ActionResult {
     if (state.currentTurn !== playerId)
         return { success: false, error: "Not your turn" };
-    if (state.phase !== "playing")
+    if (state.phase !== "playing" && state.phase !== "screw_called")
         return { success: false, error: "Cannot draw now" };
     if (state.deck.length === 0) {
         // Reshuffle discard into deck
@@ -227,7 +228,7 @@ export function drawFromDiscard(
 ): ActionResult {
     if (state.currentTurn !== playerId)
         return { success: false, error: "Not your turn" };
-    if (state.phase !== "playing")
+    if (state.phase !== "playing" && state.phase !== "screw_called")
         return { success: false, error: "Cannot draw now" };
     if (state.discardPile.length === 0)
         return { success: false, error: "Discard pile is empty" };
@@ -415,7 +416,7 @@ export function useSpecialAbility(
                 return { success: false, error: "Must specify own card index" };
 
             const newCards = playerHand.cards.map((c, i) =>
-                i === ownCardIndex ? { ...c, faceUp: true } : c
+                i === ownCardIndex ? { ...c, peekedBy: playerId } : c
             );
             newState = {
                 ...newState,
@@ -438,7 +439,7 @@ export function useSpecialAbility(
             if (!targetHand) return { success: false, error: "Target not found" };
 
             const newCards = targetHand.cards.map((c, i) =>
-                i === targetCardIndex ? { ...c, faceUp: true } : c
+                i === targetCardIndex ? { ...c, peekedBy: playerId } : c
             );
             newState = {
                 ...newState,
@@ -677,10 +678,19 @@ export function buildClientState(
             state.currentTurn === forPlayerId && heldCard ? heldCard : null,
         players: state.players.map((player) => ({
             playerId: player.playerId,
-            cards: player.cards.map((card) => {
-                // Own cards are visible; others hidden unless faceUp
+            nickname: player.nickname,
+            cards: player.cards.map((card, idx) => {
                 const isOwn = player.playerId === forPlayerId;
-                const shouldReveal = card.faceUp || isOwn;
+
+                // Rules for revealing card info to this client:
+                // 1. It's faceUp (visible to all)
+                // 2. It's the peek phase, it's our own hand, and it's an outer card (0 or 3)
+                // 3. We are currently peeking this card privately
+                const isPeekPhaseOuter = state.phase === "peek" && isOwn && (idx === 0 || idx === 3);
+                const isPeekedByMe = card.peekedBy === forPlayerId;
+
+                const shouldReveal = card.faceUp || isPeekPhaseOuter || isPeekedByMe;
+
                 return {
                     id: card.id,
                     suit: shouldReveal ? card.suit : undefined,

@@ -69,6 +69,15 @@ export function initSocketServer(httpServer: HTTPServer) {
 
                 socketPlayerMap.set(socket.id, { playerId: player.id, tableId: null });
 
+                const playerInfo: PlayerInfo = {
+                    id: player.id,
+                    nickname: player.nickname,
+                    position: -1,
+                    isConnected: true
+                };
+
+                socket.emit("lobby:joined", playerInfo);
+
                 // Send current tables
                 const tables = await getPublicTables();
                 socket.emit("lobby:tables_update", tables);
@@ -256,7 +265,10 @@ export function initSocketServer(httpServer: HTTPServer) {
                     return;
                 }
 
-                if (room.info.status === "in_game") {
+                // Allow starting if game hasn't started OR if previous round is over
+                const isRoundOver = room.gameState && ["revealing", "scoring", "finished"].includes(room.gameState.phase);
+
+                if (room.info.status === "in_game" && !isRoundOver) {
                     socket.emit("game:error", "Game already started");
                     return;
                 }
@@ -463,7 +475,7 @@ export function initSocketServer(httpServer: HTTPServer) {
                             ...room.gameState,
                             players: room.gameState.players.map((p) => ({
                                 ...p,
-                                cards: p.cards.map((c) => ({ ...c, faceUp: false })),
+                                cards: p.cards.map((c) => ({ ...c, peekedBy: null })),
                             })),
                         };
                         broadcastGameState(io, room);
